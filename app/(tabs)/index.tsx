@@ -1,70 +1,138 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, Button, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import axios from 'axios';
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+type SaleItem = {
+  id_nota: string;
+  nama: string;
+  subtotal: string;
+  created_at: string;
+};
 
-export default function HomeScreen() {
+interface ApiResponse {
+  message: string;
+  data: SaleItem[];
+  pagination: {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+  };
+}
+
+const VITE_BASE_URL = 'http://localhost:4444/api'; // Ganti dengan URL API yang sesuai
+const DEFAULT_LIMIT = 10;
+
+export default function SaleListScreen() {
+  const [saleData, setSaleData] = useState<SaleItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>('');
+  const [page, setPage] = useState<number>(1);
+  const [hasMore, setHasMore] = useState<boolean>(true);
+
+  useEffect(() => {
+    fetchSaleData(page);
+  }, [page]);
+
+  const fetchSaleData = async (pageNumber: number) => {
+    try {
+      setLoading(true);
+      const response = await axios.get<ApiResponse>(`${VITE_BASE_URL}/penjualan`, {
+        params: { page: pageNumber, limit: DEFAULT_LIMIT }
+      });
+      const newData = response.data.data;
+      setSaleData((prevData) => [...prevData, ...newData]);
+      setHasMore(newData.length === DEFAULT_LIMIT);
+    } catch (err: any) {
+      setError('Gagal mengambil data penjualan');
+      Alert.alert('Error', `Gagal mengambil data: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleScroll = (event: any) => {
+    const bottom = event.nativeEvent.layoutMeasurement.height + event.nativeEvent.contentOffset.y >= event.nativeEvent.contentSize.height - 50;
+    if (bottom && !loading && hasMore) {
+      setPage((prevPage) => prevPage + 1);
+    }
+  };
+
+  function handleView(id: string) {
+    console.log(`View clicked for ID Nota: ${id}`);
+  }
+
+  function handleEdit(id: string) {
+    console.log(`Edit clicked for ID Nota: ${id}`);
+  }
+
+  function handleDelete(id: string) {
+    console.log(`Delete clicked for ID Nota: ${id}`);
+  }
+
+  if (loading && saleData.length === 0) {
+    return <ActivityIndicator size="large" color="#0000ff" />;
+  }
+
+  if (error) {
+    return <Text style={styles.error}>{error}</Text>;
+  }
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({ ios: 'cmd + d', android: 'cmd + m' })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <ScrollView contentContainerStyle={styles.container} onScroll={handleScroll} scrollEventThrottle={400}>
+      <Text style={styles.header}>Daftar Penjualan</Text>
+      {saleData.map((item, index) => (
+        <View key={item.id_nota} style={styles.card}>
+          <Text style={styles.text}>
+            No: {index + 1} - ID Nota: {item.id_nota}
+          </Text>
+          <Text style={styles.text}>Nama: {item.nama}</Text>
+          <Text style={styles.text}>Sub Total: {item.subtotal}</Text>
+          <Text style={styles.text}>Tanggal: {item.created_at}</Text>
+          <View style={styles.buttonContainer}>
+            <Button title="View" onPress={() => handleView(item.id_nota)} color="#1E90FF" />
+            <Button title="Edit" onPress={() => handleEdit(item.id_nota)} color="#FFA500" />
+            <Button title="Delete" onPress={() => handleDelete(item.id_nota)} color="#FF6347" />
+          </View>
+        </View>
+      ))}
+      {loading && <ActivityIndicator size="small" color="#0000ff" />}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    padding: 16,
   },
-  stepContainer: {
-    gap: 8,
+  header: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  card: {
+    backgroundColor: '#f8f8f8',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+  },
+  text: {
+    fontSize: 16,
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  error: {
+    color: 'red',
+    textAlign: 'center',
+    marginTop: 20,
   },
 });
